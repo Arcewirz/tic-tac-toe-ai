@@ -5,7 +5,8 @@ import re
 from dataclasses import dataclass
 from functools import cached_property
 
-from tic_tac_toe.logic.validators import validate_grid
+from tic_tac_toe.logic.exceptions import InvalidMove
+from tic_tac_toe.logic.validators import validate_grid, validate_game_state
 
 
 WINNING_PATTERNS = (
@@ -71,6 +72,10 @@ class GameState:
     starting_mark: Mark = Mark('X')
 
 
+    def __post_init__(self) -> None:
+        validate_game_state(self)
+
+
     @cached_property
     def current_mark(self) -> Mark:
         if self.grid.x_count == self.grid.o_count:
@@ -113,3 +118,30 @@ class GameState:
                         for match in re.finditer(r'\?', pattern)
                     ]
         return []
+
+
+    @cached_property
+    def possible_moves(self) -> list[Move]:
+        moves = []
+        if not self.game_over:
+            for match in re.finditer(r'\s', self.grid.cells):
+                moves.append(self.make_move_to(match.start()))
+            return moves
+
+
+    def make_move_to(self, index: int) -> Move:
+        if self.grid.cells[index] != ' ':
+            raise InvalidMove('Cell is not empty')
+        return Move(
+            mark=self.current_mark,
+            cell_index=index,
+            before_state=self,
+            after_state=GameState(
+                Grid(
+                    self.grid.cells[:index]
+                    + self.current_mark
+                    + self.grid.cells[index + 1:]
+                ),
+                self.starting_mark,
+            ),
+        )
